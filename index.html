@@ -1,9 +1,95 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Fronus Dashboard</title>
+
+    <link rel="stylesheet" href="css/style.css">
+
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
+
 <body>
-    <h1>Fronus Dashboard Loading...</h1>
+
+<div class="container">
+
+    <header>
+
+        <h1>☀️ FRONUS META-6KW</h1>
+
+        <div id="status" class="offline">
+            ● OFFLINE
+        </div>
+
+    </header>
+
+    <div class="cards">
+
+        <div class="card">
+            <h3>Solar Power</h3>
+            <p id="pvPower">0 W</p>
+        </div>
+
+        <div class="card">
+            <h3>Grid Voltage</h3>
+            <p id="gridVoltage">0 V</p>
+        </div>
+
+        <div class="card">
+            <h3>Grid Current</h3>
+            <p id="gridCurrent">0 A</p>
+        </div>
+
+        <div class="card">
+            <h3>Load Power</h3>
+            <p id="loadPower">0 W</p>
+        </div>
+
+        <div class="card">
+            <h3>Today's Energy</h3>
+            <p id="todayEnergy">0.00 kWh</p>
+        </div>
+
+        <div class="card">
+            <h3>Total Energy</h3>
+            <p id="totalEnergy">0.00 kWh</p>
+        </div>
+
+        <div class="card">
+            <h3>Temperature</h3>
+            <p id="temperature">-- °C</p>
+        </div>
+
+        <div class="card">
+            <h3>Frequency</h3>
+            <p id="frequency">0 Hz</p>
+        </div>
+
+    </div>
+
+    <div class="graph">
+
+        <h2>Live Power Graph</h2>
+
+        <canvas id="powerChart"></canvas>
+
+    </div>
+
+    <footer>
+
+        Last Update :
+        <span id="lastUpdate">Never</span>
+
+    </footer>
+
+</div>
+
+<script src="js/app.js"></script>
+<script src="js/mqtt.js"></script>
+
 </body>
+
 </html>
