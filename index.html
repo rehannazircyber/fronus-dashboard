@@ -20,11 +20,19 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js">
     </script>
 
-    <!-- ===== MQTT.JS ===== -->
-    <script src="https://cdn.jsdelivr.net/npm/mqtt@5.5.3/dist/mqtt.min.js">
+    <!-- ===== MQTT.JS (v5.x) — loaded BEFORE dashboard JS ===== -->
+    <script src="https://unpkg.com/mqtt@5.5.3/dist/mqtt.min.js">
+    </script>
+    <!-- Fallback CDN in case unpkg is blocked -->
+    <script>
+        // If mqtt is not defined after unpkg load, try jsdelivr fallback
+        if (typeof mqtt === 'undefined') {
+            document.write(
+                '<script src="https://cdn.jsdelivr.net/npm/mqtt@5.5.3/dist/mqtt.min.js"><\/script>'
+                );
+        }
     </script>
 
-    <!-- ===== INLINE STYLES (will be extracted to style.css after approval) ===== -->
     <style>
         /* ============================================================
                ROOT VARIABLES & RESET
@@ -1649,8 +1657,8 @@
                         <span>Sync</span>
                     </span>
                     <span class="mqtt-status" id="mqttStatus">
-                        <span class="dot online" id="mqttDot"></span>
-                        <span id="mqttLabel">MQTT</span>
+                        <span class="dot connecting" id="mqttDot"></span>
+                        <span id="mqttLabel">Connecting...</span>
                     </span>
                 </div>
             </div>
@@ -2042,7 +2050,7 @@
                     </div>
                     <div class="setting-row">
                         <div class="setting-label">MQTT Port <small>WebSocket port</small></div>
-                        <input type="number" id="mqttPort" value="8000" />
+                        <input type="number" id="mqttPort" value="8884" />
                     </div>
                     <div class="setting-row">
                         <div class="setting-label">Username <small>Optional</small></div>
@@ -2142,7 +2150,7 @@
     </div><!-- /main -->
 
     <!-- ============================================================
-    JAVASCRIPT — All logic (will be extracted to script.js after approval)
+    JAVASCRIPT — All dashboard logic (runs AFTER MQTT library loads)
     ============================================================ -->
     <script>
         /* ============================================================
@@ -2153,6 +2161,16 @@
             'use strict';
 
             // ============================================================
+            // 0. GUARD: Ensure MQTT library is loaded
+            // ============================================================
+            if (typeof mqtt === 'undefined') {
+                console.error('[FATAL] MQTT library failed to load. Dashboard will run in simulation mode only.');
+                // We'll still run the dashboard with simulation fallback
+            } else {
+                console.log('[MQTT] Library loaded successfully.');
+            }
+
+            // ============================================================
             // 1. STATE
             // ============================================================
             const state = {
@@ -2160,6 +2178,7 @@
                 mqtt: null,
                 mqttConnected: false,
                 mqttReconnectTimer: null,
+                mqttLibraryAvailable: typeof mqtt !== 'undefined',
 
                 // Data cache (last known values)
                 data: {
@@ -2186,7 +2205,7 @@
                 // Settings
                 settings: {
                     mqttHost: 'broker.hivemq.cloud',
-                    mqttPort: 8000,
+                    mqttPort: 8884, // HiveMQ Cloud default WebSocket port
                     mqttUsername: '',
                     mqttPassword: '',
                     mqttClientId: 'fronus-dashboard-01',
@@ -2204,7 +2223,7 @@
                 chartUpdateInterval: null,
                 flowTimer: null,
 
-                // Simulated data for demo (will be replaced by real MQTT)
+                // Simulated data for demo (fallback when MQTT is off)
                 simInterval: null,
                 simCounter: 0,
             };
@@ -2486,9 +2505,20 @@
             // 8. MQTT
             // ============================================================
             function connectMQTT() {
+                // --- Guard: check if MQTT library is available ---
+                if (typeof mqtt === 'undefined') {
+                    console.warn('[MQTT] Library not available — running in simulation mode.');
+                    DOM.mqttDot.className = 'dot offline';
+                    DOM.mqttLabel.textContent = 'Unavailable';
+                    DOM.sidebarStatusDot.className = 'status-dot offline';
+                    DOM.offlineBanner.classList.add('show');
+                    document.querySelectorAll('.card').forEach(c => c.classList.add('offline'));
+                    return;
+                }
+
                 const settings = state.settings;
                 const host = settings.mqttHost || 'broker.hivemq.cloud';
-                const port = settings.mqttPort || 8000;
+                const port = settings.mqttPort || 8884;
                 const clientId = settings.mqttClientId || 'fronus-dashboard-' + Math.random().toString(16).substr(2, 6);
                 const username = settings.mqttUsername || '';
                 const password = settings.mqttPassword || '';
@@ -2517,6 +2547,7 @@
                         DOM.mqttLabel.textContent = 'MQTT';
                         DOM.sidebarStatusDot.className = 'status-dot online';
                         DOM.offlineBanner.classList.remove('show');
+                        document.querySelectorAll('.card').forEach(c => c.classList.remove('offline'));
 
                         // Subscribe to topics
                         const base = settings.mqttTopic || 'fronus/meta6kw';
@@ -2614,6 +2645,7 @@
                     DOM.mqttLabel.textContent = 'Failed';
                     DOM.sidebarStatusDot.className = 'status-dot offline';
                     DOM.offlineBanner.classList.add('show');
+                    document.querySelectorAll('.card').forEach(c => c.classList.add('offline'));
                 }
             }
 
@@ -2687,8 +2719,7 @@
                                 borderWidth: 2,
                             }]
                         },
-                        options: { ...commonOpts, plugins: { ...commonOpts.plugins, legend: { ...commonOpts.plugins
-                                    .legend, labels: { ...commonOpts.plugins.legend.labels } } } }
+                        options: { ...commonOpts }
                     });
                 }
 
@@ -3052,7 +3083,6 @@
             }
 
             function exportPDF() {
-                // Simple print-to-PDF fallback using window.print
                 alert('📄 PDF Export: Use "Save as PDF" from the print dialog.');
                 window.print();
             }
@@ -3071,7 +3101,7 @@
 
                 // Apply to UI
                 DOM.mqttHost.value = state.settings.mqttHost || 'broker.hivemq.cloud';
-                DOM.mqttPort.value = state.settings.mqttPort || 8000;
+                DOM.mqttPort.value = state.settings.mqttPort || 8884;
                 DOM.mqttUsername.value = state.settings.mqttUsername || '';
                 DOM.mqttPassword.value = state.settings.mqttPassword || '';
                 DOM.mqttClientId.value = state.settings.mqttClientId || 'fronus-dashboard-01';
@@ -3093,7 +3123,7 @@
 
             function saveSettings() {
                 state.settings.mqttHost = DOM.mqttHost.value.trim() || 'broker.hivemq.cloud';
-                state.settings.mqttPort = parseInt(DOM.mqttPort.value) || 8000;
+                state.settings.mqttPort = parseInt(DOM.mqttPort.value) || 8884;
                 state.settings.mqttUsername = DOM.mqttUsername.value.trim();
                 state.settings.mqttPassword = DOM.mqttPassword.value.trim();
                 state.settings.mqttClientId = DOM.mqttClientId.value.trim() || 'fronus-dashboard-01';
@@ -3127,7 +3157,7 @@
                 if (!confirm('Reset all settings to defaults?')) return;
                 const defaults = {
                     mqttHost: 'broker.hivemq.cloud',
-                    mqttPort: 8000,
+                    mqttPort: 8884,
                     mqttUsername: '',
                     mqttPassword: '',
                     mqttClientId: 'fronus-dashboard-01',
@@ -3198,7 +3228,7 @@
                 // Init charts
                 initCharts();
 
-                // Start MQTT
+                // Start MQTT (with guard)
                 connectMQTT();
 
                 // Start simulation fallback
@@ -3231,8 +3261,9 @@
 
                 console.log('🚀 FRONUS META-6KW Dashboard initialized');
                 console.log('📊 Theme:', state.theme);
-                console.log('🔌 MQTT:', state.settings.mqttHost);
+                console.log('🔌 MQTT:', state.settings.mqttHost + ':' + state.settings.mqttPort);
                 console.log('🔄 Auto-reconnect:', state.settings.autoReconnect);
+                console.log('📦 MQTT library available:', state.mqttLibraryAvailable);
             }
 
             // ============================================================
